@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>three.js DMRI brain tractography</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        body {
+            font-family: Monospace;
+            background-color: #000;
+            color: #fff;
+            margin: 0px;
+            overflow: hidden;
+        }
+        #info {
+            color: #fff;
+            position: absolute;
+            top: 15px;
+            width: 100%;
+            text-align: center;
+            z-index: 100;
+            display:block;
+        }
+        #info a, .button { color: #f00; font-weight: bold; text-decoration: underline; cursor: pointer }
+    </style>
+</head>
+
+<body>
+
+<script src="./js/three.js"></script>
+<script src="./js/TubePointGeometry.js"></script>
+<script src="./js/NewGeometryLoader.js"></script>
+<script src="./js/MinmaxBoxGeometry.js"></script>
+<script src="./js/BoxLoader.js"></script>
+<script src="./js/TrackballControls.js"></script>
+<script src="./js/Detector.js"></script>
+<script src="./js/stats.min.js"></script>
+
+<script>
+    if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+    var container, stats;
+
+    var camera, controls, scene, renderer;
+    var group;
+    var cross;
+
+    init();
+    animate();
+
+
+    function init() {
+
+        container = document.createElement( 'div' );
+        document.body.appendChild( container );
+        var info = document.createElement( 'div' );
+        info.style.position = 'absolute';
+        info.style.top = '15px';
+        info.style.width = '100%';
+        info.style.textAlign = 'center';
+        info.innerHTML = 'DMRI brain tractography-----FA value comparison';
+
+        container.appendChild( info );
+        camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 1000 );
+
+        camera.position.z = 220;
+        controls = new THREE.TrackballControls( camera );
+
+        controls.rotateSpeed = 1.0;
+        controls.zoomSpeed = 1.2;
+        controls.panSpeed = 0.8;
+
+        controls.noZoom = false;
+        controls.noPan = false;
+
+        controls.staticMoving = true;
+        controls.dynamicDampingFactor = 0.3;
+
+        controls.keys = [ 65, 83, 68 ];
+
+        controls.addEventListener( 'change', render );
+
+        // scene
+        scene = new THREE.Scene();
+
+        var light;
+        light = new THREE.PointLight();
+        light.position.set( 0, 0, 0 );
+        scene.add( light );
+
+        light = new THREE.DirectionalLight( 0xffeedd );
+        light.position.set( 0, 0, 120 );
+        scene.add( light );
+        light = new THREE.DirectionalLight( 0xffeedd );
+        light.position.set( 0, 0, -120 );
+        scene.add( light );
+        light = new THREE.DirectionalLight( 0xffeedd );
+        light.position.set( 120, 120, 0 );
+        scene.add( light );
+        light = new THREE.DirectionalLight( 0xffeedd );
+        light.position.set( -120, 0, 0 );
+        scene.add( light );
+
+        var helper = new THREE.GridHelper( 200, 10 );
+        helper.setColors( 0x0000ff, 0x808080 );
+        helper.position.y = -100;
+        scene.add( helper );
+        group = new THREE.Object3D();
+        //object
+        var manager = new THREE.LoadingManager();
+        manager.onProgress = function ( item, loaded, total ) {
+
+            console.log( item, loaded, total );
+
+        };
+
+        var loader = new GeometryLoader(manager );
+        loader.load( './data/single/s1_cc.data', function ( object ) {
+
+
+            //---------------------------color bar-----------------------------//
+            if(loader.minColor!== undefined && loader.maxColor!== undefined)
+            {
+                var barsquareGeometry = new THREE.Geometry();
+                barsquareGeometry.vertices.push(new THREE.Vector3(-5,  40, 0.0));
+                barsquareGeometry.vertices.push(new THREE.Vector3( 5,  40, 0.0));
+                barsquareGeometry.vertices.push(new THREE.Vector3( 5, -40, 0.0));
+                barsquareGeometry.vertices.push(new THREE.Vector3(-5, -40, 0.0));
+                barsquareGeometry.faces.push(new THREE.Face3(0, 1, 2));
+
+                barsquareGeometry.faces[0].vertexColors[0] = loader.minColor;
+                 barsquareGeometry.faces[0].vertexColors[1] = loader.minColor;
+                 barsquareGeometry.faces[0].vertexColors[2] = loader.maxColor;
+
+                 barsquareGeometry.faces.push(new THREE.Face3(2, 3, 0));
+                 barsquareGeometry.faces[1].vertexColors[0] = loader.maxColor;
+                 barsquareGeometry.faces[1].vertexColors[1] = loader.maxColor;
+                 barsquareGeometry.faces[1].vertexColors[2] = loader.minColor;
+                var squareMaterial = new THREE.MeshBasicMaterial({
+                    side:THREE.DoubleSide,
+                    vertexColors:THREE.VertexColors});
+
+                var squareMesh = new THREE.Mesh(barsquareGeometry, squareMaterial);
+                squareMesh.position.set(100, 0, 0);
+                scene.add(squareMesh);
+            }
+            object.position.x = -114.6;
+            object.position.y = -117.8;
+            object.position.z = -92.1;
+            group.add( object );
+        } );
+
+        var manager1 = new THREE.LoadingManager();
+        manager1.onProgress = function ( item, loaded, total ) {
+
+            console.log( item, loaded, total );
+
+        };
+        var material = new THREE.MeshBasicMaterial({
+            wireframe: true,
+            color: 'yellow'
+        });
+        var loaderbox = new BoxLoader(manager1 );
+        loaderbox.load( './data/box/tumorbox_0_region_s1.data', function ( geometry ) {
+            if(geometry !== undefined)
+            {
+                var mesh = new THREE.Mesh( geometry, material );
+                mesh.position.x = loaderbox.center.x;
+                mesh.position.y = loaderbox.center.y;
+                mesh.position.z = loaderbox.center.z ;
+                group.add(mesh);
+            }
+        } );
+
+        var manager2 = new THREE.LoadingManager();
+        manager2.onProgress = function ( item, loaded, total ) {
+
+            console.log( item, loaded, total );
+
+        };
+        var loaderbox2 = new BoxLoader(manager2 );
+        loaderbox2.load( './data/box/tumorbox_1_region_s1.data', function ( geometry ) {
+            if (geometry !== undefined) {
+                var mesh = new THREE.Mesh(geometry, material);
+                mesh.position.x = loaderbox2.center.x;
+                mesh.position.y = loaderbox2.center.y;
+                mesh.position.z = loaderbox2.center.z;
+                group.add(mesh);
+            }
+        });
+        scene.add(group);
+        //render
+        renderer = new THREE.WebGLRenderer({antialias:true});
+        renderer.setSize( window.innerWidth, window.innerHeight );
+
+        container.appendChild( renderer.domElement );
+
+        stats = new Stats();
+        stats.domElement.style.position = 'absolute';
+        stats.domElement.style.top = '0px';
+        stats.domElement.style.zIndex = 100;
+        container.appendChild( stats.domElement );
+
+        window.addEventListener( 'resize', onWindowResize, false );
+
+    }
+
+    function onWindowResize() {
+
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize( window.innerWidth, window.innerHeight );
+
+        controls.handleResize();
+
+        render();
+
+    }
+
+    //
+    function animate() {
+
+        requestAnimationFrame( animate );
+        controls.update();
+        render();
+    }
+
+    function render() {
+
+        renderer.render( scene, camera );
+        stats.update();
+
+    }
+
+</script>
+
+</body>
+</html>
